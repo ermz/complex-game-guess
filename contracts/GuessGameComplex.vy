@@ -15,6 +15,16 @@
 #once the right guess is made a gmae should not allow people to play
 #Once a game make a payment 1% of the amount will go to the contract as a fee
 
+event Game_created:
+    owner: indexed(address)
+    game_id: uint256
+    time: uint256
+
+event Game_solved:
+    solver: indexed(address)
+    game_id: uint256
+    time: uint256
+
 struct game:
     game_owner: address
     secret_number: uint256
@@ -35,7 +45,7 @@ def __init__():
 
 @external
 @payable
-def create_game(_secret_number:uint256) -> uint256:
+def create_game(_secret_number:uint256) -> bool:
     assert msg.value == 10*(10**18), "You should pay 10 ether to create game"
     assert (_secret_number >= 0) and (_secret_number <= 100), "Number should be in the range of 0-100"
     self.game_index[self.curr_id].game_owner = msg.sender
@@ -44,12 +54,18 @@ def create_game(_secret_number:uint256) -> uint256:
     self.game_index[self.curr_id].guess_count = 0
     self.game_index[self.curr_id].is_active = True
     self.curr_id = self.curr_id + 1
-    return self.curr_id - 1
+    log Game_created(msg.sender, self.curr_id - 1, block.timestamp)
+    return True
 
 @external
 @view
 def get_game_balance(_game_id:uint256) -> uint256:
     return self.game_index[_game_id].game_balance
+
+@external
+@view
+def get_game_status(_game_id:uint256) -> bool:
+    return self.game_index[_game_id].is_active
         
 @external
 @payable
@@ -67,6 +83,7 @@ def play_game(_game_id: uint256, _game_guess: uint256) -> String[100]:
         send(self.contract_owner, self.game_index[_game_id].game_balance / 100)
         self.game_index[_game_id].game_balance = 0
         self.game_index[_game_id].is_active = False
+        log Game_solved(msg.sender, _game_id, block.timestamp)
         return "Congrats you just got paid"
     elif self.game_index[_game_id].guess_count >= 10:
         self.game_index[_game_id].is_active = False
